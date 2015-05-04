@@ -1,0 +1,27 @@
+{
+  "name": "lp-input",
+  "version": "0.0.1",
+  "authors": [
+    "Horacio Ibrahim <horacioibrahim@gmail.com>"
+  ],
+  "description": "lp-input provides a ghost operator that makes input like twitter, slack",
+  "keywords": [
+    "web-component",
+    "web-components",
+    "polymer",
+    "lp-input"
+  ],
+  "main": "lp-input.html",
+  "license": "MIT",
+  "homepage": "https://github.com/horacioibrahim/lp-input/",
+  "ignore": [
+    "/.*",
+    "/tests/"
+  ],
+  "dependencies": {
+    "polymer": "Polymer/polymer#^0.5.4"
+  },
+  "devDependencies": {
+    "web-component-tester": "*"
+  }
+}

@@ -1,0 +1,60 @@
+<!doctype html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1.0, user-scalable=yes">
+  <title>lp-ugettext Demo</title>
+
+  <script src="../bower_components/webcomponentsjs/webcomponents.min.js"></script>
+  <link rel="import" href="lp-input.html">
+  <style>
+     #editable {
+      font-family: Roboto;
+      font-size: 10px;
+      font-weight: 300;
+      border: 2px solid #ccc;
+      border-radius: 5px;
+      height: 65px;
+      font-size: 22px;
+      padding: 10px;
+      overflow: scroll;
+      z-index: -1;
+      outline: none;
+     }  
+     #editableShadow {
+      border: 2px solid #ccc;
+      border-radius: 5px;
+      height: 25px;
+      font-size: 22px;
+      padding: 10px;
+      overflow: scroll;
+      z-index: -1;
+      outline: none;
+     }        
+     #editable em {
+      font-style: normal;
+      color: rgba(77, 143, 252, 1);
+     } 
+  </style>
+</head>
+<body unresolved>
+      <!-- Demo -->
+      <lp-input target="editable" mentionsURL="users_.json"></lp-input>
+      <div id="editable" contenteditable="true" >
+      </div>  
+      <!-- Issues -->
+      <br />
+      <ol>
+       <li><input type="checkbox" checked value="# Mover para input ao inves keyup"># Mover para input ao inves keyup</li>
+       <li><input type="checkbox" checked value="# # Aplicar a solucao de editar a hashtag similar ao comportamento quanto temos somente uma"># Aplicar a solucao de editar a hashtag similar ao comportamento quanto temos somente uma hashtag</li>
+       <li><input type="checkbox"  checked value="# Duas hashtags"># Duas ou mais hashtags</li>       
+       <li><input type="checkbox" checked value="# Apagar texto no final quando duas ou mais hashtags"># Apagar texto no final quando duas ou mais hashtags. (pegando a hashatag com espaço e selecionado o node anterior: usar node1 #node2 #node3 apagar)</li>
+       <li><input type="checkbox" checked value="# Dois nodes repetidos p/ testar equal"># Duas hashtags repetidas p/ testar equal <br> # [RESOLVIDO: com isSameEqual em shadow input editableFilter]<br> # isSameEqual not valid</li>
+       <li><input type="checkbox" value="# Tests"># Cobertura de testes</li> 
+       <li><input type="checkbox" value="# Deleter uma de duas hashtags"># Deleter uma de duas hashtags. A antepenultima quando tem textos entre elas XXX #das01 YYY #abc ZZZ</li>  
+       <li><input type="checkbox" value="# Tornar uma palavra hashtag pula para o fim"># Tornar uma palavra hashtag pula para o fim da palavra</li> 
+       <li><input type="checkbox" value="# Seperar"># Seperar texo de hashtag. Criar outro e move</li>
+       <li><input type="checkbox" value="# Suporte para FF, Opera, Safari...IE"># Suporte para browsers nesta ordem</li>       
+      </ol>
+
+</body>
+</html>

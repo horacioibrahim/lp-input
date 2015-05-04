@@ -1,0 +1,425 @@
+<link rel="import" href="../bower_components/polymer/polymer.html">
+<link rel="import" href="../bower_components/core-list/core-list.html">
+<link rel="import" href="../bower_components/core-ajax/core-ajax.html">
+
+<!--
+lp-input provides a operator to an ordinary div with contenteditable=true 
+and makes it like twitter or slack box.
+
+##### Example
+      <div id="editable" contenteditable="true">
+        <br/>
+      </div>
+      <lp-input target="editable"></lp-input>
+
+@element lp-input
+@blurb Element providing a ghost operator that makes input like twitter
+@status beta
+@homepage http://github.com/horacioibrahim/lp-input
+-->
+<polymer-element name="lp-input" attributes="target shadow hcolor mentionsURL appendUserChar appendTagChar debug">
+  <template>
+
+      <link rel="stylesheet" href="lp-input.css">
+
+      <!-- dropdown list of users 
+           init search by @na...
+      -->
+      <div id="mentionsContainer">
+          <ul id="ulMentionsContainer">
+            <template repeat="{{user in responseUsers.Users }}">
+              <li on-click="{{ selectedUser }}" data-shortname="{{ user.shortname }}"
+              data-location="{{ user.location }}" data-avatar="{{ user.avatar }}">
+                  <div class="mentions">
+                      <div class="avatar">
+                          <img src="{{user.avatar}}">
+                      </div>
+                      <div class="info">
+                        <div class="username">{{ user.shortname }}</div>
+                        <div class="details">{{ user.location }}</div> 
+                      </div>
+                  </div>          
+              </li> 
+            </template>
+          </ul>
+      </div>
+
+      <!-- dropdown list of hashtags -->
+      <div class="hashtags"></div>
+
+      <!-- filter content div --> 
+      <div id="editableFilter" contenteditable="true" hidden>
+        <br/>
+      </div> 
+
+      <!-- ajax -->
+      <core-ajax auto id="mentionsAjax" url="{{ mentionsURL }}"
+      response="{{responseUsers}}"></core-ajax>
+      
+      <core-ajax id="tagsAjax" url="{{ tagsURL }}" response="{{responseTags}}"></core-ajax>
+
+
+  </template>
+  <script>
+    (function () {
+      Polymer('lp-input', {
+       
+        publish: {
+          target: "editable",
+          targetElem: null,
+          hcolor: "blue",
+          savedRange: null,
+          tagRegex: /(#){1}([A-Z]+[A-Z0-9]+)/ig,
+          userRegex: /(@){1}([A-Z]+[A-Z0-9]+)/ig,
+          linkRegex: /https?:\/\/(www\.)?[-a-z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-z0-9@:%_\+.~#?&\/=]*)?/ig,
+          appendUserChar: '@',
+          appendTagChar: '#',
+          debug: true,
+          isNewNode: false
+        },    
+        ready: function () {
+          // get the div#editable passed by user
+          this.targetElem = document.querySelector('#' + this.target);
+          // get current custom element object
+          var fakeThis = document.querySelector('lp-input');
+          // listen by inputs
+          this.targetElem.addEventListener('input', function(e) {
+             fakeThis.checkInput();         
+          });  
+          // liste by keydown to handling <space>, <backspace>, <ctrl+z>, etc.
+          this.targetElem.addEventListener('keydown', function(e) {
+            fakeThis.keysPressed(e); 
+          });  
+
+        },
+        selectedUser: function(ev, detail, target) {
+            /** Gets data from user selected/tapped in mentios list.
+            */
+            shortname = target.attributes['data-shortname'].value;
+            avatar = target.attributes['data-avatar'].value;
+            section = target.attributes['data-location'].value;
+            this.unshowyMentionsBox(); // hide box
+            this.fire('selected-user', {response: {'shortname': shortname, 'avatar': avatar, 'section': section}})
+        },         
+        showMentionsBox: function() {
+            /** Show Mentions Box.
+            */
+            this.$.mentionsContainer.style.display = "block";
+        },
+        unshowyMentionsBox: function() {
+            /** Hide Mentions Box.
+            */          
+            this.$.mentionsContainer.style.display = "none";
+        },
+        getMentions: function() {
+            /** Creates an URL to access the User's data, updates the attribute
+            url of the "mentionsAjax" that has auto=true and emit (or updates) 
+            the responseUsers setted in "mentionsAjax".
+            element (lp-input).
+            */
+            // TODO
+            var mentionsAjax = this.$.mentionsAjax;
+            var url = url + mention;
+            var json_data = mentionsAjax.response;
+            return json_data;
+        },
+        getTags: function() {
+            /** Creates an URL to access the Tag's data, updates the attribute
+            url of the "tagsAjax" that has auto=true. Therefore, the tagsAjax,
+            emit (or updates) the responseTags variable of the current custom 
+            element (lp-input).
+            */    
+            // TODO        
+            var tagsAjax = this.$.tagsAjax;
+            var json_data = tagsAjax.response;
+            return json_data;
+        },
+        hasWhiteSpace: function(node) {
+          /** Tests if formatted hashtag has space.
+          */  
+          var str = 'full';
+
+          // Is need to have childNodes.
+          if (node !== undefined && node.hasChildNodes()) {
+              str = node.childNodes[0].textContent;
+              console.log("lastCharIsEmpty: hasChildNodes  YES!");
+          }
+
+          return /\s/g.test(str);
+
+        },     
+        restoreSelection: function (nodeIndex, nodeOffset) {
+            /** Restores the position of the caret/cursor based in params and
+            fix these params when is need (see //#fixed).
+            */
+            var textNode = null;
+            var newNode = null;
+            this.targetElem.focus();
+
+            console.log("restoreSelection [nodeIndex]:" + nodeIndex);
+            console.log("restoreSelection [nodeOffset]:" + nodeOffset);
+       
+            if (window.getSelection) //non IE and there is already a selection
+            {
+                var s = window.getSelection();
+                // #fixed
+                // if (nodeIndex === null ) {
+                  //nodeIndex = 0;
+                //}
+
+                // if pressed space inner node hashtag (eg.: <em>XYZ</em>)
+                if (this.isNewNode) { 
+                  newNode = document.createTextNode('');
+                  this.keyCode = '';
+                  console.log("HERE: -1 : have newNode/newNode");
+                  // nodeOffset = 0;
+                }     
+
+                if (this.targetElem.childNodes.length > 0) {  
+                    
+                    if (this.targetElem.childNodes[nodeIndex] !== undefined && 
+                      this.targetElem.childNodes[nodeIndex].hasChildNodes()) {
+                      textNode = this.targetElem.childNodes[nodeIndex].childNodes[0];
+                      console.log("HERE: 0");                 
+
+                    } else {
+                      // #fixed: when deleting characters by final users, 
+                      // the nodeIndex can be greater than the numbers of nodes.
+                      // This results in undefined node.
+                        textNode = this.targetElem.childNodes[nodeIndex];
+                        console.log("# less childNode [textNode]: " + textNode.textContent);                 
+                    }
+                   
+                    // get range
+                    range = s.getRangeAt(0);
+                    // #fixed: If the users to press space inner a node this
+                    // action creates a empty new node.
+                    if (newNode) {
+                      textNode = this.targetElem.childNodes[nodeIndex + 1]; // TEST
+                      
+                      if (textNode === undefined) {
+                        textNode = this.targetElem.childNodes[nodeIndex]
+                        range.setStartAfter(textNode);  
+                        range.insertNode(newNode);
+                        range.setStart(textNode, 1);
+                        console.log("# nao tinha node na FRENTE "); 
+                      } else {
+                        range.setStartBefore(textNode);
+                        range.insertNode(newNode);
+                        range.setStart(textNode, 1);
+                        console.log("# nao tinha node na ATRAS ");                         
+                      }
+                      
+                      console.log("HERE NewNode: 1");
+                      console.log("NodeIndex: " + nodeIndex);
+                      console.log("Restore HERE 1 newNode: " + newNode.textContent);
+                      console.log("Restore HERE 1 textNode: " + textNode.textContent);
+                      // range.setStart(newNode, Math.min(nodeOffset, newNode.textContent.length));
+                    } else {
+                      console.log("HERE: 2");
+                      console.log("Restore has nodeOffset (2): " + nodeOffset);
+                      console.log("Restore has nodeOffset (2):  " + textNode.textContent);
+                      range.setStart(textNode, nodeOffset);
+                    }
+                    // applied changes
+                    s.removeAllRanges();
+                    range.collapse(true); // Inpired by God! ;)
+                    s.addRange(range);
+                }
+            }
+            else if (document.createRange)//non IE and no selection
+            {
+                window.getSelection().addRange(this.savedRange);
+            }
+            else if (document.selection)//IE
+            {
+                this.savedRange.select();
+            }
+        }, 
+        currentNodeIndexIs: function(currentNode, listNodes) {
+          /** Gets the current index based in selection.anchorNode with childNodes
+          of the target object (div#editable)
+
+          @param currentNode: is selection.anchorNode
+          @param listNodeS: is childNodes of the div#editable
+          */
+          var nodeIndex = null;
+          var node = null;
+
+          // trying to verify in target
+          for (var i = 0; i < listNodes.length; i++) {
+            
+            if (listNodes[i].hasChildNodes()) {
+              node = listNodes[i].childNodes[0];
+              
+            } else {
+              node = listNodes[i];  
+            }
+            
+            if (node === currentNode) {
+              nodeIndex = i;
+              console.log("ord matched:" + i);
+              console.log("ord matched:" + node.textContent);
+              break;
+            } else {
+              nodeIndex = null;
+            }
+
+          }
+          // trying to verify in shadow of the target. Shadow of the target is
+          // the element "editableFilter" that receives a copy before changes.
+          if (nodeIndex === null) {
+            for (var j = 0; j < this.$.editableFilter.childNodes.length; j++) {
+              
+              if (this.$.editableFilter.childNodes[j].hasChildNodes()) {
+                node = this.$.editableFilter.childNodes[j].childNodes[0];
+              } else {
+                node = this.$.editableFilter.childNodes[j];  
+              }
+                  
+              if (node === currentNode) {
+                nodeIndex = j;
+                break;
+              } else {
+                nodeIndex = null;
+              }
+
+            }            
+          }
+
+          return nodeIndex
+        },
+        inlinePosition: function(oldNodeIndex, oldNodeOffset, oldChildNodes) {
+          // pressuponha onde vai cai basedo nos novos filhos
+          this.superPos = '';
+          var sumBefore = 0;
+          console.log("## > inlinePosition: " + oldNodeIndex + " " + oldNodeOffset + " " + oldChildNodes);
+          for (var i = oldNodeIndex - 1; i >= 0; i--) {
+              console.log("## > length: " + oldChildNodes[i].textContent.length);
+              sumBefore = sumBefore + oldChildNodes[i].textContent.length;
+              console.log("## > sumBefore: " + sumBefore);
+          }
+          this.superPos = sumBefore + oldNodeOffset;
+        },  
+        inNodePosition: function(superPos, newChildNodes) {
+          /** Returns the index and offset inner node of newChildNodes based in superPos.
+          
+          @param superPos: position of the caret in plain text view
+          @param new ChildNodes: set of nodes where the superPos must stay in place.
+          */
+          var childLengths = [];
+          var segment = 0;
+          var index, offset;
+
+          for (var i = 0; i < newChildNodes.length; i++) {
+            childLengths[i] = newChildNodes[i].textContent.length;
+          }
+          
+          function indexAndOffset(point, line) {
+            console.log("[inNodePosition] point and line size: " + point + " " + line.length);
+            for (var i = 0; i < line.length; i++) {
+                offset = point - segment;
+                segment = segment + line[i];
+                console.log("[inNodePosition SAFARI point < Segment] index, point, segment, offset: " + index + " " + point + "  " + segment + " " + offset);
+                if (point <= segment) {
+                  index = i;
+                  console.log("[inNodePosition point < Segment] index, point, segment, offset: " + index + " " + point + "  " + segment + " " + offset);
+                  break;
+                }
+            }
+
+            segment = 0; // guarantee
+            console.log("### > index, offset :" + index + " " + offset);
+            return [index, offset];
+          }
+          
+          return indexAndOffset(superPos, childLengths);
+        },
+        sizeNode: function(nodeIndex, childNodes) {
+          return childNodes[nodeIndex].textContent.length;
+        },
+        checkInput: function () {
+            // var filterEditableContent = this.targetElem.textContent;
+            var currentText = this.targetElem.textContent;
+            var newText = this.formatter(currentText);
+            var nodeIndex = null;
+            var indexCurrent = null;
+            var selection = document.getSelection();
+            var range = selection.getRangeAt(0);
+            var currentNode = range.startContainer
+            var nodeOffset = range.startOffset;
+
+            // check numbers of nodes
+            nodes = this.targetElem.childNodes.length;
+            // get current node index. "You are here". Before normalized.
+            var indexCurrent = this.currentNodeIndexIs(currentNode, this.targetElem.childNodes);  
+            // The target element is copied here
+            this.$.editableFilter.innerHTML = this.targetElem.innerHTML;
+            console.log("HTML from editableFilter is: " + this.$.editableFilter.innerHTML);
+            // The changes of the target element occurs here
+            this.targetElem.innerHTML = newText;            
+            // Defines the nodeIndex. Together with offset defines the position
+            // of the caret. 
+            nodesCurrent = this.targetElem.childNodes.length;
+
+            // section for tests
+            this.inlinePosition(indexCurrent, nodeOffset, this.$.editableFilter.childNodes);
+            console.log("## > this superPos is: " + this.superPos);
+            inNodePosition = this.inNodePosition(this.superPos, this.targetElem.childNodes);
+            nodeIndex = inNodePosition[0];
+            nodeOffset = inNodePosition[1];
+            // end tests section
+            
+            // check if blank space in last char
+            this.isNewNode = this.hasWhiteSpace(this.$.editableFilter.childNodes[indexCurrent]);  
+            // change the shadow of the target
+            this.$.editableFilter.innerHTML = newText;
+            // Restores the caret with this function
+            console.log("[checkInput] nodeIndex and nodeOffset: ", + nodeIndex + " " + nodeOffset);
+            console.log("[checkInput] nodes (before) and nodes (after): ", + nodes + " " + this.targetElem.childNodes.length);
+            this.restoreSelection(nodeIndex, nodeOffset);
+
+        },                          
+        formatter: function(text) {
+            /** Formats the string typed by user in target object. The target
+            object is a div with contenteditable=true
+
+            @param text: the string will be formatted
+            */
+            var MAX_SIZE = 3;
+            var unameHtagRegex = /(#|@){1}([A-Z]+[A-Z0-9]+)/ig;
+            var linkRegex = this.linkRegex;
+            var wrapTimeout = 0;
+            var flatText = "",
+                flatText2Hash = "",
+                flatTextBefore = "",
+                flatTextAfter = "";
+
+            function wrapEm(match) {
+                return "<em>" + match + "</em>";
+            }
+            function replaceHash(text) {
+                return text.replace(unameHtagRegex, wrapEm);
+            }
+            function wrapLink(match) {
+                return "<a target='_blank' href=" + match + ">" + match + "</a>";
+            }
+            function replaceLink(text) {
+                return text.replace(linkRegex, wrapLink);
+            } 
+
+            return replaceHash(text);
+        },
+        keysPressed: function(e) {
+          /** Sets this.keyCode with keycode from key pressed by user.
+          */
+          if (e.keyCode == 27) {
+            this.unshowyMentionsBox();
+          }
+          this.keyCode = e.keyCode;
+          console.log("keyCode: " + this.keyCode);
+        }
+      });
+    })();
+  </script>
+</polymer-element>
