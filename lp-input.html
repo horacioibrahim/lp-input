@@ -1,14 +1,13 @@
 <link rel="import" href="../bower_components/polymer/polymer.html">
-<link rel="import" href="../bower_components/core-list/core-list.html">
 <link rel="import" href="../bower_components/core-ajax/core-ajax.html">
 
 <!--
-lp-input provides a operator to an ordinary div with contenteditable=true 
-and makes it like twitter or slack box.
+lp-input is a custom "fake input" to search users, hashtags by ajax and to 
+format the content by using ordinary div#editable. Works like twitter, facebook,
+slack inputs.
 
 ##### Example
       <div id="editable" contenteditable="true">
-        <br/>
       </div>
       <lp-input target="editable"></lp-input>
 
@@ -17,7 +16,8 @@ and makes it like twitter or slack box.
 @status beta
 @homepage http://github.com/horacioibrahim/lp-input
 -->
-<polymer-element name="lp-input" attributes="target shadow hcolor mentionsURL appendUserChar appendTagChar debug">
+
+<polymer-element name="lp-input" attributes="target mentionsURL">
   <template>
 
       <link rel="stylesheet" href="lp-input.css">
@@ -47,7 +47,7 @@ and makes it like twitter or slack box.
       <!-- dropdown list of hashtags -->
       <div class="hashtags"></div>
 
-      <!-- filter content div --> 
+      <!-- This elements will be a copy of the contentEditable passed by user. --> 
       <div id="editableFilter" contenteditable="true" hidden>
         <br/>
       </div> 
@@ -63,142 +63,152 @@ and makes it like twitter or slack box.
   <script>
     (function () {
       Polymer('lp-input', {
-       
+        /**
+        * Fired when a user is selected in mentions box.
+        *
+        * @event selected-user
+        */        
         publish: {
+          /**
+          * The target is ID's value of the div.contentEditable.
+          *
+          * @attribute target
+          * @type string
+          * @default 'editable'
+          */          
           target: "editable",
-          targetElem: null,
-          hcolor: "blue",
-          savedRange: null,
+          __targetElem: null,
           tagRegex: /(#){1}([A-Z]+[A-Z0-9]+)/ig,
           userRegex: /(@){1}([A-Z]+[A-Z0-9]+)/ig,
           linkRegex: /https?:\/\/(www\.)?[-a-z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-z0-9@:%_\+.~#?&\/=]*)?/ig,
-          appendUserChar: '@',
-          appendTagChar: '#',
-          debug: true,
           isNewNode: false
         },    
         ready: function () {
           // get the div#editable passed by user
-          this.targetElem = document.querySelector('#' + this.target);
+          this._targetElem = document.querySelector('#' + this.target);
           // get current custom element object
           var fakeThis = document.querySelector('lp-input');
           // listen by inputs
-          this.targetElem.addEventListener('input', function(e) {
+          this._targetElem.addEventListener('input', function() {
              fakeThis.checkInput();         
           });  
           // liste by keydown to handling <space>, <backspace>, <ctrl+z>, etc.
-          this.targetElem.addEventListener('keydown', function(e) {
+          this._targetElem.addEventListener('keydown', function(e) {
             fakeThis.keysPressed(e); 
           });  
 
         },
+        /*
+        * Gets data from user selected/tapped in mentions list. Fires the 
+        * 'selected-user' event.
+        *
+        * @method selectedUser
+        */        
         selectedUser: function(ev, detail, target) {
-            /** Gets data from user selected/tapped in mentios list.
-            */
             shortname = target.attributes['data-shortname'].value;
             avatar = target.attributes['data-avatar'].value;
             section = target.attributes['data-location'].value;
-            this.unshowyMentionsBox(); // hide box
+            this.hideMentions(); // hide box
             this.fire('selected-user', {response: {'shortname': shortname, 'avatar': avatar, 'section': section}})
-        },         
-        showMentionsBox: function() {
-            /** Show Mentions Box.
-            */
+        },    
+        /*
+        * Show Mentions Box.
+        *
+        * @method showMentions
+        */             
+        showMentions: function() {
             this.$.mentionsContainer.style.display = "block";
         },
-        unshowyMentionsBox: function() {
-            /** Hide Mentions Box.
-            */          
+        /*
+        * Hide Mentions Box.
+        *
+        * @method hideMentions
+        */          
+        hideMentions: function() {        
             this.$.mentionsContainer.style.display = "none";
         },
+        /*
+        * Emits the responseUsers's updates. Creates an URL to access the user's 
+        * data from a services, like RestAPI, and changes the attribute of 
+        * core-ajax called "#mentionsAjax".
+        *
+        * @method getMentions
+        */        
         getMentions: function() {
-            /** Creates an URL to access the User's data, updates the attribute
-            url of the "mentionsAjax" that has auto=true and emit (or updates) 
-            the responseUsers setted in "mentionsAjax".
-            element (lp-input).
-            */
             // TODO
             var mentionsAjax = this.$.mentionsAjax;
             var url = url + mention;
             var json_data = mentionsAjax.response;
             return json_data;
         },
-        getTags: function() {
-            /** Creates an URL to access the Tag's data, updates the attribute
-            url of the "tagsAjax" that has auto=true. Therefore, the tagsAjax,
-            emit (or updates) the responseTags variable of the current custom 
-            element (lp-input).
-            */    
+        /*
+        * Emits the responseTags's updates. Creates an URL to access the tag's 
+        * data from a services, like RestAPI, and changes the attribute of 
+        * core-ajax called "#tagsAjax".
+        *
+        * @method getTags
+        */         
+        getTags: function() {   
             // TODO        
             var tagsAjax = this.$.tagsAjax;
             var json_data = tagsAjax.response;
             return json_data;
         },
-        hasWhiteSpace: function(node) {
-          /** Tests if formatted hashtag has space.
-          */  
+        /*
+        * Returns true if a formatted hashtag has blank space or false if not.
+        *
+        * @method _hasWhiteSpace
+        */ 
+        _hasWhiteSpace: function(node) {
           var str = 'full';
-
-          // Is need to have childNodes.
+          // Is need to have childNodes because this method is to test 'formatted'
+          // hashtag
           if (node !== undefined && node.hasChildNodes()) {
               str = node.childNodes[0].textContent;
-              console.log("lastCharIsEmpty: hasChildNodes  YES!");
           }
-
           return /\s/g.test(str);
-
-        },     
-        restoreSelection: function (nodeIndex, nodeOffset) {
-            /** Restores the position of the caret/cursor based in params and
-            fix these params when is need (see //#fixed).
-            */
+        },  
+        /*
+        * Restores the Caret to original position after changes.
+        *
+        * @param {Number} nodeIndex - The index of the node.
+        * @param {Number} nodeOffset - The offset within the node.
+        * @method restoreSelection
+        */            
+        _restoreSelection: function (nodeIndex, nodeOffset) {
             var textNode = null;
             var newNode = null;
-            this.targetElem.focus();
+            this._targetElem.focus();
 
-            console.log("restoreSelection [nodeIndex]:" + nodeIndex);
-            console.log("restoreSelection [nodeOffset]:" + nodeOffset);
+            console.log("_restoreSelection [nodeIndex]:" + nodeIndex);
+            console.log("_restoreSelection [nodeOffset]:" + nodeOffset);
        
             if (window.getSelection) //non IE and there is already a selection
             {
                 var s = window.getSelection();
-                // #fixed
-                // if (nodeIndex === null ) {
-                  //nodeIndex = 0;
-                //}
 
-                // if pressed space inner node hashtag (eg.: <em>XYZ</em>)
+                // if pressed space within a hashtag (eg.: <em>XYZ</em>)
                 if (this.isNewNode) { 
                   newNode = document.createTextNode('');
                   this.keyCode = '';
-                  console.log("HERE: -1 : have newNode/newNode");
-                  // nodeOffset = 0;
                 }     
 
-                if (this.targetElem.childNodes.length > 0) {  
+                if (this._targetElem.childNodes.length > 0) {  
                     
-                    if (this.targetElem.childNodes[nodeIndex] !== undefined && 
-                      this.targetElem.childNodes[nodeIndex].hasChildNodes()) {
-                      textNode = this.targetElem.childNodes[nodeIndex].childNodes[0];
-                      console.log("HERE: 0");                 
-
+                    if (this._targetElem.childNodes[nodeIndex].hasChildNodes()) {
+                      textNode = this._targetElem.childNodes[nodeIndex].childNodes[0];
                     } else {
-                      // #fixed: when deleting characters by final users, 
-                      // the nodeIndex can be greater than the numbers of nodes.
-                      // This results in undefined node.
-                        textNode = this.targetElem.childNodes[nodeIndex];
-                        console.log("# less childNode [textNode]: " + textNode.textContent);                 
+                      textNode = this._targetElem.childNodes[nodeIndex];
                     }
                    
                     // get range
                     range = s.getRangeAt(0);
-                    // #fixed: If the users to press space inner a node this
-                    // action creates a empty new node.
+
                     if (newNode) {
-                      textNode = this.targetElem.childNodes[nodeIndex + 1]; // TEST
+                      textNode = this._targetElem.childNodes[nodeIndex + 1]; // forward one
                       
                       if (textNode === undefined) {
-                        textNode = this.targetElem.childNodes[nodeIndex]
+                        textNode = this._targetElem.childNodes[nodeIndex]
                         range.setStartAfter(textNode);  
                         range.insertNode(newNode);
                         range.setStart(textNode, 1);
@@ -209,16 +219,10 @@ and makes it like twitter or slack box.
                         range.setStart(textNode, 1);
                         console.log("# nao tinha node na ATRAS ");                         
                       }
-                      
-                      console.log("HERE NewNode: 1");
-                      console.log("NodeIndex: " + nodeIndex);
-                      console.log("Restore HERE 1 newNode: " + newNode.textContent);
-                      console.log("Restore HERE 1 textNode: " + textNode.textContent);
-                      // range.setStart(newNode, Math.min(nodeOffset, newNode.textContent.length));
+
                     } else {
-                      console.log("HERE: 2");
-                      console.log("Restore has nodeOffset (2): " + nodeOffset);
-                      console.log("Restore has nodeOffset (2):  " + textNode.textContent);
+                      console.log("# Restore has nodeOffset (2): " + nodeOffset);
+                      console.log("# Restore has nodeOffset (2):  " + textNode.textContent);
                       range.setStart(textNode, nodeOffset);
                     }
                     // applied changes
@@ -227,22 +231,18 @@ and makes it like twitter or slack box.
                     s.addRange(range);
                 }
             }
-            else if (document.createRange)//non IE and no selection
-            {
-                window.getSelection().addRange(this.savedRange);
-            }
-            else if (document.selection)//IE
-            {
-                this.savedRange.select();
-            }
         }, 
+        /*
+        * Gets the current index. We have based in selection.anchorNode to catch
+        * the currentNode and childNodes to get listNodes.
+        *
+        * TODO: This method can be improved because this runs two for. 
+        *
+        @param {Node} currentNode - It's selection.anchorNode
+        @param {ChildNodes} listNodes -  It's childNodes of the div#editable
+        @method currentNodeIndexIs
+        */        
         currentNodeIndexIs: function(currentNode, listNodes) {
-          /** Gets the current index based in selection.anchorNode with childNodes
-          of the target object (div#editable)
-
-          @param currentNode: is selection.anchorNode
-          @param listNodeS: is childNodes of the div#editable
-          */
           var nodeIndex = null;
           var node = null;
 
@@ -258,8 +258,6 @@ and makes it like twitter or slack box.
             
             if (node === currentNode) {
               nodeIndex = i;
-              console.log("ord matched:" + i);
-              console.log("ord matched:" + node.textContent);
               break;
             } else {
               nodeIndex = null;
@@ -289,24 +287,37 @@ and makes it like twitter or slack box.
 
           return nodeIndex
         },
-        inlinePosition: function(oldNodeIndex, oldNodeOffset, oldChildNodes) {
+        /*
+        * Gets the caret position in plain text independently if (or not) exists 
+        * node. The motivation this method is because the offset returned by Web
+        * API is dependent of the node where is the caret. This is node agnostic!
+        *
+        @param {Number} nodeIndex 
+        @param {Number} nodeOffset
+        @param {ChildNodes} oldChildNodes
+        @method inlinePosition
+        */          
+        inlinePosition: function(nodeIndex, nodeOffset, oldChildNodes) {
           // pressuponha onde vai cai basedo nos novos filhos
           this.superPos = '';
           var sumBefore = 0;
-          console.log("## > inlinePosition: " + oldNodeIndex + " " + oldNodeOffset + " " + oldChildNodes);
-          for (var i = oldNodeIndex - 1; i >= 0; i--) {
+          console.log("## > inlinePosition: " + nodeIndex + " " + nodeOffset + " " + oldChildNodes);
+          for (var i = nodeIndex - 1; i >= 0; i--) {
               console.log("## > length: " + oldChildNodes[i].textContent.length);
               sumBefore = sumBefore + oldChildNodes[i].textContent.length;
               console.log("## > sumBefore: " + sumBefore);
           }
-          this.superPos = sumBefore + oldNodeOffset;
+          this.superPos = sumBefore + nodeOffset;
         },  
+        /*
+        * Returns the pair [index, offset] that is the caret position within of 
+        * an element with nodes.
+        *
+        * @param {Number} superPos - the position of the caret in plain text view
+        * @param {childNodes} newChildNodes - list of nodes returned by childNodes attrs.
+        * @method inNodePosition
+        */        
         inNodePosition: function(superPos, newChildNodes) {
-          /** Returns the index and offset inner node of newChildNodes based in superPos.
-          
-          @param superPos: position of the caret in plain text view
-          @param new ChildNodes: set of nodes where the superPos must stay in place.
-          */
           var childLengths = [];
           var segment = 0;
           var index, offset;
@@ -314,33 +325,24 @@ and makes it like twitter or slack box.
           for (var i = 0; i < newChildNodes.length; i++) {
             childLengths[i] = newChildNodes[i].textContent.length;
           }
-          
+
           function indexAndOffset(point, line) {
-            console.log("[inNodePosition] point and line size: " + point + " " + line.length);
             for (var i = 0; i < line.length; i++) {
                 offset = point - segment;
                 segment = segment + line[i];
-                console.log("[inNodePosition SAFARI point < Segment] index, point, segment, offset: " + index + " " + point + "  " + segment + " " + offset);
                 if (point <= segment) {
                   index = i;
-                  console.log("[inNodePosition point < Segment] index, point, segment, offset: " + index + " " + point + "  " + segment + " " + offset);
                   break;
                 }
             }
-
             segment = 0; // guarantee
-            console.log("### > index, offset :" + index + " " + offset);
             return [index, offset];
           }
-          
+
           return indexAndOffset(superPos, childLengths);
         },
-        sizeNode: function(nodeIndex, childNodes) {
-          return childNodes[nodeIndex].textContent.length;
-        },
         checkInput: function () {
-            // var filterEditableContent = this.targetElem.textContent;
-            var currentText = this.targetElem.textContent;
+            var currentText = this._targetElem.textContent;
             var newText = this.formatter(currentText);
             var nodeIndex = null;
             var indexCurrent = null;
@@ -350,74 +352,74 @@ and makes it like twitter or slack box.
             var nodeOffset = range.startOffset;
 
             // check numbers of nodes
-            nodes = this.targetElem.childNodes.length;
+            nodes = this._targetElem.childNodes.length;
             // get current node index. "You are here". Before normalized.
-            var indexCurrent = this.currentNodeIndexIs(currentNode, this.targetElem.childNodes);  
+            var indexCurrent = this.currentNodeIndexIs(currentNode, this._targetElem.childNodes);  
             // The target element is copied here
-            this.$.editableFilter.innerHTML = this.targetElem.innerHTML;
-            console.log("HTML from editableFilter is: " + this.$.editableFilter.innerHTML);
+            this.$.editableFilter.innerHTML = this._targetElem.innerHTML;
             // The changes of the target element occurs here
-            this.targetElem.innerHTML = newText;            
+            this._targetElem.innerHTML = newText;            
             // Defines the nodeIndex. Together with offset defines the position
             // of the caret. 
-            nodesCurrent = this.targetElem.childNodes.length;
-
-            // section for tests
+            nodesCurrent = this._targetElem.childNodes.length;
+            // Gets node index and offset
             this.inlinePosition(indexCurrent, nodeOffset, this.$.editableFilter.childNodes);
-            console.log("## > this superPos is: " + this.superPos);
-            inNodePosition = this.inNodePosition(this.superPos, this.targetElem.childNodes);
+            inNodePosition = this.inNodePosition(this.superPos, this._targetElem.childNodes);
             nodeIndex = inNodePosition[0];
-            nodeOffset = inNodePosition[1];
-            // end tests section
-            
-            // check if blank space in last char
-            this.isNewNode = this.hasWhiteSpace(this.$.editableFilter.childNodes[indexCurrent]);  
-            // change the shadow of the target
+            nodeOffset = inNodePosition[1]; 
+            // check if exists blank space in formatted hashtag
+            this.isNewNode = this._hasWhiteSpace(this.$.editableFilter.childNodes[indexCurrent]);  
+            // By last...changes the shadow/copy of the target
             this.$.editableFilter.innerHTML = newText;
             // Restores the caret with this function
             console.log("[checkInput] nodeIndex and nodeOffset: ", + nodeIndex + " " + nodeOffset);
-            console.log("[checkInput] nodes (before) and nodes (after): ", + nodes + " " + this.targetElem.childNodes.length);
-            this.restoreSelection(nodeIndex, nodeOffset);
+            console.log("[checkInput] nodes (before) and nodes (after): ", + nodes + " " + this._targetElem.childNodes.length);
+            this._restoreSelection(nodeIndex, nodeOffset);
 
-        },                          
+        }, 
+        /*
+        * Formats the string typed by user.
+        * 
+        * @param text: the string will be formatted
+        * @method formatter
+        * @return formatted string
+        */                                 
         formatter: function(text) {
-            /** Formats the string typed by user in target object. The target
-            object is a div with contenteditable=true
+          var MAX_SIZE = 3;
+          var unameHtagRegex = /(#|@){1}([A-Z]+[A-Z0-9]+)/ig;
+          var linkRegex = this.linkRegex;
+          var wrapTimeout = 0;
+          var flatText = "",
+              flatText2Hash = "",
+              flatTextBefore = "",
+              flatTextAfter = "";
 
-            @param text: the string will be formatted
-            */
-            var MAX_SIZE = 3;
-            var unameHtagRegex = /(#|@){1}([A-Z]+[A-Z0-9]+)/ig;
-            var linkRegex = this.linkRegex;
-            var wrapTimeout = 0;
-            var flatText = "",
-                flatText2Hash = "",
-                flatTextBefore = "",
-                flatTextAfter = "";
+          function wrapEm(match) {
+              return "<em>" + match + "</em>";
+          }
+          function replaceHash(text) {
+              return text.replace(unameHtagRegex, wrapEm);
+          }
+          function wrapLink(match) {
+              return "<a target='_blank' href=" + match + ">" + match + "</a>";
+          }
+          function replaceLink(text) {
+              return text.replace(linkRegex, wrapLink);
+          } 
 
-            function wrapEm(match) {
-                return "<em>" + match + "</em>";
-            }
-            function replaceHash(text) {
-                return text.replace(unameHtagRegex, wrapEm);
-            }
-            function wrapLink(match) {
-                return "<a target='_blank' href=" + match + ">" + match + "</a>";
-            }
-            function replaceLink(text) {
-                return text.replace(linkRegex, wrapLink);
-            } 
-
-            return replaceHash(text);
+          return replaceHash(text);
         },
+        /*
+        * Sets th keyCode attribute.
+        * 
+        * @param {Number} e - event returned by pressed key
+        * @method keysPressed
+        */       
         keysPressed: function(e) {
-          /** Sets this.keyCode with keycode from key pressed by user.
-          */
           if (e.keyCode == 27) {
             this.unshowyMentionsBox();
           }
           this.keyCode = e.keyCode;
-          console.log("keyCode: " + this.keyCode);
         }
       });
     })();
