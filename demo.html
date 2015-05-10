@@ -2,6 +2,7 @@
 <html>
 <head>
   <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1.0, user-scalable=yes">
+  <meta charset="UTF-8">
   <title>lp-ugettext Demo</title>
 
   <script src="../bower_components/webcomponentsjs/webcomponents.min.js"></script>
@@ -10,15 +11,19 @@
      #editable {
       font-family: Roboto;
       font-size: 10px;
+      width: 100%;
+      margin: 0;
       font-weight: 300;
       border: 2px solid #ccc;
-      border-radius: 5px;
-      height: 65px;
-      font-size: 22px;
-      padding: 10px;
-      overflow: scroll;
+      border-radius: 3px;
+      min-height: 30px;
+      font-size: .95rem;
+      padding: 5px 8px 8px 8px;
+      overflow: hidden;
       z-index: -1;
       outline: none;
+      max-height: 120px !important;
+      resize: none !important;
      }  
      #editableShadow {
       border: 2px solid #ccc;
@@ -38,9 +43,8 @@
 </head>
 <body unresolved>
       <!-- Demo -->
-      <div id="editable" contenteditable="true"></div>  
-      <lp-input target="editable" mentionsURL="model_users.json"></lp-input>
-      <!-- Issues -->
+        <div id="editable" contenteditable="true"></div>  
+        <lp-input target="editable" mentionsURL="model_users.json"></lp-input>      
       <br />
       <p>Type an text. eg.: "This text can to have #one or #more #hashtags?"</p>
 </body>

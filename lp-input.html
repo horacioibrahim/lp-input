@@ -80,8 +80,28 @@ slack inputs.
           __targetElem: null,
           tagRegex: /(#){1}([A-Z]+[A-Z0-9]+)/ig,
           userRegex: /(@){1}([A-Z]+[A-Z0-9]+)/ig,
-          linkRegex: /https?:\/\/(www\.)?[-a-z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-z0-9@:%_\+.~#?&\/=]*)?/ig,
-          isNewNode: false
+          isNewNode: false,
+          /*
+          * The isChar is used together with "isKey" to check if the input inserted
+          * by user is a char or only a key pressed. Because accents "aren't"
+          * chars.
+          *
+          * @attribute isChar
+          * @type boolean
+          * @default false
+          */ 
+          isChar: false,
+          /*
+          * The isKey is used together with "isChar" to check if the input inserted
+          * by user is a char or only a key pressed. Because accents "aren't"
+          * chars.
+          *
+          * @attribute isChar
+          * @type boolean
+          * @default false
+          */           
+          isKey: false,
+          valueText: null
         },    
         ready: function () {
           // get the div#editable passed by user
@@ -89,15 +109,35 @@ slack inputs.
           // get current custom element object
           var fakeThis = document.querySelector('lp-input');
           // listen by inputs
-          this._targetElem.addEventListener('input', function() {
-             fakeThis.checkInput();         
+          this._targetElem.addEventListener('input', function(event) {
+             fakeThis.checkInput();
+          });          
+          /* 
+          this._targetElem.addEventListener('keypress', function(event) {
+             fakeThis.isChar = true;
+             fakeThis.valueText = this.textContent; 
           });  
-          // liste by keydown to handling <space>, <backspace>, <ctrl+z>, etc.
-          this._targetElem.addEventListener('keydown', function(e) {
-            fakeThis.keysPressed(e); 
-          });  
-
+          this._targetElem.addEventListener('keyup', function(event) {
+             fakeThis.isKey = true;
+             fakeThis.valueText = this.textContent; 
+          }); */           
         },
+        /*
+        * Checks if textContent of the contentEditable was changed. If the input
+        * is a char isKey and isChar will be true, therefore the "checkIinput" is
+        * called.
+        *
+        * @method valueTextChanged
+        */          
+        valueTextChanged: function() {
+          console.log("# Entrou valueTextChanged");
+         /*  if (this.isKey == this.isChar) {
+            this.checkInput();  
+          }
+          this.isKey = false;
+          this.isChar = false;
+          */
+        }, 
         /*
         * Gets data from user selected/tapped in mentions list. Fires the 
         * 'selected-user' event.
@@ -166,7 +206,7 @@ slack inputs.
           if (node !== undefined && node.hasChildNodes()) {
               str = node.childNodes[0].textContent;
           }
-          return /\s/g.test(str);
+          return /\s|&nbsp;/g.test(str);
         },  
         /*
         * Restores the Caret to original position after changes.
@@ -180,8 +220,6 @@ slack inputs.
             var newNode = null;
             this._targetElem.focus();
 
-            console.log("_restoreSelection [nodeIndex]:" + nodeIndex);
-            console.log("_restoreSelection [nodeOffset]:" + nodeOffset);
        
             if (window.getSelection) //non IE and there is already a selection
             {
@@ -190,7 +228,6 @@ slack inputs.
                 // if pressed space within a hashtag (eg.: <em>XYZ</em>)
                 if (this.isNewNode) { 
                   newNode = document.createTextNode('');
-                  this.keyCode = '';
                 }     
 
                 if (this._targetElem.childNodes.length > 0) {  
@@ -212,17 +249,13 @@ slack inputs.
                         range.setStartAfter(textNode);  
                         range.insertNode(newNode);
                         range.setStart(textNode, 1);
-                        console.log("# nao tinha node na FRENTE "); 
                       } else {
                         range.setStartBefore(textNode);
                         range.insertNode(newNode);
                         range.setStart(textNode, 1);
-                        console.log("# nao tinha node na ATRAS ");                         
                       }
 
                     } else {
-                      console.log("# Restore has nodeOffset (2): " + nodeOffset);
-                      console.log("# Restore has nodeOffset (2):  " + textNode.textContent);
                       range.setStart(textNode, nodeOffset);
                     }
                     // applied changes
@@ -299,13 +332,11 @@ slack inputs.
         */          
         inlinePosition: function(nodeIndex, nodeOffset, oldChildNodes) {
           // pressuponha onde vai cai basedo nos novos filhos
-          this.superPos = '';
+          this.superPos = 0;
           var sumBefore = 0;
-          console.log("## > inlinePosition: " + nodeIndex + " " + nodeOffset + " " + oldChildNodes);
-          for (var i = nodeIndex - 1; i >= 0; i--) {
-              console.log("## > length: " + oldChildNodes[i].textContent.length);
+          for (var i = nodeIndex - 1; i >= 0; i--) { // loop on nodes
+              n = oldChildNodes[i];
               sumBefore = sumBefore + oldChildNodes[i].textContent.length;
-              console.log("## > sumBefore: " + sumBefore);
           }
           this.superPos = sumBefore + nodeOffset;
         },  
@@ -342,7 +373,7 @@ slack inputs.
           return indexAndOffset(superPos, childLengths);
         },
         checkInput: function () {
-            var currentText = this._targetElem.textContent;
+            var currentText = this._targetElem.textContent; // sanitize
             var newText = this.formatter(currentText);
             var nodeIndex = null;
             var indexCurrent = null;
@@ -357,10 +388,10 @@ slack inputs.
             var indexCurrent = this.currentNodeIndexIs(currentNode, this._targetElem.childNodes);  
             // The target element is copied here
             this.$.editableFilter.innerHTML = this._targetElem.innerHTML;
-            // The changes of the target element occurs here
-            this._targetElem.innerHTML = newText;            
+            // The changes of the target element occurs here  
+            this._targetElem.innerHTML =  String(newText);
             // Defines the nodeIndex. Together with offset defines the position
-            // of the caret. 
+            // of the caret.
             nodesCurrent = this._targetElem.childNodes.length;
             // Gets node index and offset
             this.inlinePosition(indexCurrent, nodeOffset, this.$.editableFilter.childNodes);
@@ -372,10 +403,9 @@ slack inputs.
             // By last...changes the shadow/copy of the target
             this.$.editableFilter.innerHTML = newText;
             // Restores the caret with this function
-            console.log("[checkInput] nodeIndex and nodeOffset: ", + nodeIndex + " " + nodeOffset);
-            console.log("[checkInput] nodes (before) and nodes (after): ", + nodes + " " + this._targetElem.childNodes.length);
+            // console.log("[checkInput] nodeIndex and nodeOffset: ", + nodeIndex + " " + nodeOffset);
+            // console.log("[checkInput] nodes (before) and nodes (after): ", + nodes + " " + this._targetElem.childNodes.length);            
             this._restoreSelection(nodeIndex, nodeOffset);
-
         }, 
         /*
         * Formats the string typed by user.
@@ -385,14 +415,7 @@ slack inputs.
         * @return formatted string
         */                                 
         formatter: function(text) {
-          var MAX_SIZE = 3;
           var unameHtagRegex = /(#|@){1}([A-Z]+[A-Z0-9]+)/ig;
-          var linkRegex = this.linkRegex;
-          var wrapTimeout = 0;
-          var flatText = "",
-              flatText2Hash = "",
-              flatTextBefore = "",
-              flatTextAfter = "";
 
           function wrapEm(match) {
               return "<em>" + match + "</em>";
@@ -400,17 +423,12 @@ slack inputs.
           function replaceHash(text) {
               return text.replace(unameHtagRegex, wrapEm);
           }
-          function wrapLink(match) {
-              return "<a target='_blank' href=" + match + ">" + match + "</a>";
-          }
-          function replaceLink(text) {
-              return text.replace(linkRegex, wrapLink);
-          } 
-
-          return replaceHash(text);
+          newText = replaceHash(text);
+          newText = newText.replace(/\s/g, '&nbsp;'); // use <meta charset="UTF-8">
+          return newText;
         },
         /*
-        * Sets th keyCode attribute.
+        * Sets the keyCode attribute.
         * 
         * @param {Number} e - event returned by pressed key
         * @method keysPressed
@@ -420,7 +438,17 @@ slack inputs.
             this.unshowyMentionsBox();
           }
           this.keyCode = e.keyCode;
-        }
+        },
+        /*
+        * Sets the charTyped attribute.
+        * 
+        * @param {Number} e - event returned by keypress
+        * @method charTypedCode
+        */       
+        charTypedCode: function(e) {
+          charCode = e.char ? e.char : e.charCode;
+          this.charTyped = charCode;
+        }        
       });
     })();
   </script>
