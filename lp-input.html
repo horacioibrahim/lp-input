@@ -80,6 +80,15 @@ slack inputs.
           __targetElem: null,
           tagRegex: /(#){1}([A-Z]+[A-Z0-9]+)/ig,
           userRegex: /(@){1}([A-Z]+[A-Z0-9]+)/ig,
+          /*
+          * The isNewNode persists boolean that contains info if the typed data 
+          * must be to generate a new node. This occurs when the user types 
+          * white-space inner a node-hashtag.
+          *
+          * @attribute isNewNode
+          * @type boolean
+          * @default false
+          */ 
           isNewNode: false,
           /*
           * The isChar is used together with "isKey" to check if the input inserted
@@ -109,18 +118,13 @@ slack inputs.
           // get current custom element object
           var fakeThis = document.querySelector('lp-input');
           // listen by inputs
-          this._targetElem.addEventListener('input', function(event) {
+          this._targetElem.addEventListener('keydown', function(event) {
              fakeThis.checkInput();
           });          
-          /* 
-          this._targetElem.addEventListener('keypress', function(event) {
-             fakeThis.isChar = true;
-             fakeThis.valueText = this.textContent; 
-          });  
           this._targetElem.addEventListener('keyup', function(event) {
-             fakeThis.isKey = true;
-             fakeThis.valueText = this.textContent; 
-          }); */           
+             // fakeThis.isKey = true;
+             // fakeThis.valueText = this.textContent; 
+          });                  
         },
         /*
         * Checks if textContent of the contentEditable was changed. If the input
@@ -130,7 +134,7 @@ slack inputs.
         * @method valueTextChanged
         */          
         valueTextChanged: function() {
-          console.log("# Entrou valueTextChanged");
+          // console.log("# Entrou valueTextChanged");
          /*  if (this.isKey == this.isChar) {
             this.checkInput();  
           }
