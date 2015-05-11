@@ -53,7 +53,7 @@ slack inputs.
       </div> 
 
       <!-- ajax -->
-      <core-ajax auto id="mentionsAjax" url="{{ mentionsURL }}"
+      <core-ajax auto id="mentionsAjax" url="{{ mentions }}"
       response="{{responseUsers}}"></core-ajax>
       
       <core-ajax id="tagsAjax" url="{{ tagsURL }}" response="{{responseTags}}"></core-ajax>
@@ -80,6 +80,14 @@ slack inputs.
           __targetElem: null,
           tagRegex: /(#){1}([A-Z]+[A-Z0-9]+)/ig,
           userRegex: /(@){1}([A-Z]+[A-Z0-9]+)/ig,
+          /**
+          * The mentionsSearch is an URL to search users.
+          *
+          * @attribute mentionsSearch
+          * @type string
+          * @default ''
+          */           
+          mentionsURL: '',
           /*
           * The isNewNode persists boolean that contains info if the typed data 
           * must be to generate a new node. This occurs when the user types 
@@ -123,7 +131,7 @@ slack inputs.
           });          
           this._targetElem.addEventListener('keyup', function(event) {
              // fakeThis.isKey = true;
-             // fakeThis.valueText = this.textContent; 
+             fakeThis.valueText = this.textContent; 
           });                  
         },
         /*
@@ -141,6 +149,21 @@ slack inputs.
           this.isKey = false;
           this.isChar = false;
           */
+          var selection = document.getSelection();
+          var range = selection.getRangeAt(0);
+          var currentNode = range.startContainer;
+          var maluco = "js";
+          // get current node index. "You are here". Before normalized.
+          var indexCurrent = this.currentNodeIndexIs(currentNode, this._targetElem.childNodes);
+          var nodeValue = currentNode.nodeValue;
+          if (/^@/g.test(nodeValue)) {
+              this.getMentions(nodeValue);
+              this.showMentions(); // TODO: filter by string...
+              this.addEventListener('selected-user', function(ev) {
+                currentNode.nodeValue = '@' + ev.detail.response.shortname;
+                this._restoreSelection(indexCurrent, currentNode.nodeValue.length);
+              });
+          }
         }, 
         /*
         * Gets data from user selected/tapped in mentions list. Fires the 
@@ -161,7 +184,7 @@ slack inputs.
         * @method showMentions
         */             
         showMentions: function() {
-            this.$.mentionsContainer.style.display = "block";
+          this.$.mentionsContainer.style.display = "block";
         },
         /*
         * Hide Mentions Box.
@@ -178,12 +201,20 @@ slack inputs.
         *
         * @method getMentions
         */        
-        getMentions: function() {
+        getMentions: function(expr) {
             // TODO
             var mentionsAjax = this.$.mentionsAjax;
-            var url = url + mention;
-            var json_data = mentionsAjax.response;
-            return json_data;
+            var url = '';
+            
+            if (/\/$/.test(this.mentionsURL)) {
+              url = this.mentionsURL + expr;
+            } else {
+              url = this.mentionsURL.concat('/', expr);
+            }
+            console.log(url);
+            this.mentionsAjax.url = url;
+            // var json_data = mentionsAjax.response;
+            // return json_data;
         },
         /*
         * Emits the responseTags's updates. Creates an URL to access the tag's 
@@ -442,17 +473,7 @@ slack inputs.
             this.unshowyMentionsBox();
           }
           this.keyCode = e.keyCode;
-        },
-        /*
-        * Sets the charTyped attribute.
-        * 
-        * @param {Number} e - event returned by keypress
-        * @method charTypedCode
-        */       
-        charTypedCode: function(e) {
-          charCode = e.char ? e.char : e.charCode;
-          this.charTyped = charCode;
-        }        
+        },       
       });
     })();
   </script>
