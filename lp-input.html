@@ -118,7 +118,7 @@ slack inputs.
           // get current custom element object
           var fakeThis = document.querySelector('lp-input');
           // listen by inputs
-          this._targetElem.addEventListener('keydown', function(event) {
+          this._targetElem.addEventListener('input', function(event) {
              fakeThis.checkInput();
           });          
           this._targetElem.addEventListener('keyup', function(event) {
