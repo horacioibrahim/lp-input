@@ -27,7 +27,7 @@ slack inputs.
       -->
       <div id="mentionsContainer">
           <ul id="ulMentionsContainer">
-            <template repeat="{{user in responseUsers.Users }}">
+            <template repeat="{{user in Users}}">
               <li on-click="{{ selectedUser }}" data-shortname="{{ user.shortname }}"
               data-location="{{ user.location }}" data-avatar="{{ user.avatar }}">
                   <div class="mentions">
@@ -53,7 +53,7 @@ slack inputs.
       </div> 
 
       <!-- ajax -->
-      <core-ajax auto id="mentionsAjax" url="{{ mentions }}"
+      <core-ajax auto="true" id="mentionsAjax" url="{{ mentions }}"
       response="{{responseUsers}}"></core-ajax>
       
       <core-ajax id="tagsAjax" url="{{ tagsURL }}" response="{{responseTags}}"></core-ajax>
@@ -118,7 +118,8 @@ slack inputs.
           * @default false
           */           
           isKey: false,
-          valueText: null
+          valueText: null,
+          Users: []
         },    
         ready: function () {
           // get the div#editable passed by user
@@ -152,13 +153,11 @@ slack inputs.
           var selection = document.getSelection();
           var range = selection.getRangeAt(0);
           var currentNode = range.startContainer;
-          var maluco = "js";
           // get current node index. "You are here". Before normalized.
           var indexCurrent = this.currentNodeIndexIs(currentNode, this._targetElem.childNodes);
           var nodeValue = currentNode.nodeValue;
-          if (/^@/g.test(nodeValue)) {
+          if (/^@/g.test(nodeValue) && nodeValue.length > 3 ) {
               this.getMentions(nodeValue);
-              this.showMentions(); // TODO: filter by string...
               this.addEventListener('selected-user', function(ev) {
                 currentNode.nodeValue = '@' + ev.detail.response.shortname;
                 this._restoreSelection(indexCurrent, currentNode.nodeValue.length);
@@ -202,19 +201,23 @@ slack inputs.
         * @method getMentions
         */        
         getMentions: function(expr) {
-            // TODO
             var mentionsAjax = this.$.mentionsAjax;
             var url = '';
-            
+                        
             if (/\/$/.test(this.mentionsURL)) {
               url = this.mentionsURL + expr;
             } else {
               url = this.mentionsURL.concat('/', expr);
             }
-            console.log(url);
-            this.mentionsAjax.url = url;
-            // var json_data = mentionsAjax.response;
-            // return json_data;
+            this.mentions = url;
+
+            // waiting... and ...update Users
+            this.addEventListener('core-response', function(){
+               data = JSON.parse(this.responseUsers);
+               this.Users = data.Users;
+            });
+
+            this.showMentions();
         },
         /*
         * Emits the responseTags's updates. Creates an URL to access the tag's 
