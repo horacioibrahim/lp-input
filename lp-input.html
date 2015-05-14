@@ -1,5 +1,6 @@
 <link rel="import" href="../bower_components/polymer/polymer.html">
 <link rel="import" href="../bower_components/core-ajax/core-ajax.html">
+<link rel="import" href="../bower_components/core-a11y-keys/core-a11y-keys.html">
 
 <!--
 lp-input is a custom "fake input" to search users, hashtags by ajax and to 
@@ -17,7 +18,7 @@ slack inputs.
 @homepage http://github.com/horacioibrahim/lp-input
 -->
 
-<polymer-element name="lp-input" attributes="target mentionsURL">
+<polymer-element name="lp-input" attributes="target mentionsURL url method">
   <template>
 
       <link rel="stylesheet" href="lp-input.css">
@@ -44,6 +45,9 @@ slack inputs.
           </ul>
       </div>
 
+      <!-- shortcut -->
+      <core-a11y-keys target="{{_targetElem}}" keys="Enter" on-keys-pressed="{{sendTo}}"></core-a11y-keys>
+
       <!-- dropdown list of hashtags -->
       <div class="hashtags"></div>
 
@@ -55,8 +59,11 @@ slack inputs.
       <!-- ajax -->
       <core-ajax auto="true" id="mentionsAjax" url="{{ mentions }}"
       response="{{responseUsers}}"></core-ajax>
-      
       <core-ajax id="tagsAjax" url="{{ tagsURL }}" response="{{responseTags}}"></core-ajax>
+      <core-ajax id="coreAjaxInput" url="{{url}}" handleAs="json" 
+      response="{{responseComments}}" method="{{ method }}"
+      contentType="application/json">
+      </core-ajax>
 
 
   </template>
@@ -67,7 +74,14 @@ slack inputs.
         * Fired when a user is selected in mentions box.
         *
         * @event selected-user
-        */        
+        */   
+        /**
+        * The `sc-error-handling` fires when user try to post comments without
+        * the number of the register. To handling this events to show pop-up
+        * messages.
+        *
+        * @event sc-error-handling
+        */              
         publish: {
           /**
           * The target is ID's value of the div.contentEditable.
@@ -77,7 +91,7 @@ slack inputs.
           * @default 'editable'
           */          
           target: "editable",
-          __targetElem: null,
+          _targetElem: null,
           tagRegex: /(#){1}([A-Z]+[A-Z0-9]+)/ig,
           userRegex: /(@){1}([A-Z]+[A-Z0-9]+)/ig,
           /**
@@ -119,8 +133,36 @@ slack inputs.
           */           
           isKey: false,
           valueText: null,
-          Users: []
+          Users: [],
+          /*
+          * The `register` is the Issue's ID to post comments.
+          *
+          * @attribute register
+          * @type string
+          * @default null
+          */ 
+          register: null, 
+          /**
+          * The `url` to post comments.
+          *
+          * @attribute url
+          * @type string
+          * @default ''
+          */           
+          url: '',
+          /**
+          * The `method` used to send ajax's data.
+          *
+          * @attribute method
+          * @type string
+          * @default 'POST'
+          */           
+          method: 'POST',            
         },    
+        created: function() {
+          // initialize but it not is turned public to use by users of the element
+          // to turn public to use attributes or publish.
+        },        
         ready: function () {
           // get the div#editable passed by user
           this._targetElem = document.querySelector('#' + this.target);
@@ -134,6 +176,8 @@ slack inputs.
              // fakeThis.isKey = true;
              fakeThis.valueText = this.textContent; 
           });                  
+
+          this.setRegister(document, 'sc-select', fakeThis);
         },
         /*
         * Checks if textContent of the contentEditable was changed. If the input
@@ -209,15 +253,12 @@ slack inputs.
             } else {
               url = this.mentionsURL.concat('/', expr);
             }
-            this.mentions = url;
-
-            // waiting... and ...update Users
-            this.addEventListener('core-response', function(){
-               data = JSON.parse(this.responseUsers);
-               this.Users = data.Users;
-            });
-
-            this.showMentions();
+            this.mentions = url;            
+        },
+        responseUsersChanged: function() {
+           data = JSON.parse(this.responseUsers);
+           this.Users = data.Users;
+           this.showMentions();
         },
         /*
         * Emits the responseTags's updates. Creates an URL to access the tag's 
@@ -476,7 +517,42 @@ slack inputs.
             this.unshowyMentionsBox();
           }
           this.keyCode = e.keyCode;
-        },       
+        }, 
+        sendTo: function(){
+            var ajax = this.$.coreAjaxInput;
+            var data = {};
+            var dataUser = JSON.parse(window.localStorage.getItem('User'));              
+            if (!dataUser) {
+              var dataUser = {}
+              dataUser['pk'] = 'DEMOWRAPPER';  
+            }
+            
+            body = this._targetElem.textContent;
+            data['body'] = body;
+            data['register'] = this.register;
+            data['author'] = dataUser['pk']; // TODO: fix it
+            if (body.length > 0 && this.register) {
+              ajax.body = JSON.stringify(data);  
+              ajax.go();
+              this._targetElem.innerHTML = '';
+            }
+
+            if(!this.register) {
+              this.fire('sc-error-handling', {error: "Not selected register"});
+            }
+        },
+        setRegister: function(source, eventName, elem) {
+            source.addEventListener(eventName, function(e) {
+              register = e.detail.issue;
+              register = register.replace('/', '');
+              elem.register = register;
+            });
+        },
+        responseCommentsChanged: function() {
+          // to fire a 'sc-sse-response' fake similar at sc-sse 
+          this.fire('sc-sse-response', {response: this.responseComments, alias: 'sseTimeline'});
+        },
+
       });
     })();
   </script>
