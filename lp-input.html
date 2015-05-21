@@ -531,7 +531,7 @@ slack inputs.
             data['body'] = body;
             data['register'] = this.register;
             data['author'] = dataUser['pk']; // TODO: fix it
-            if (body.length > 0 && this.register) {
+            if (body.length > 0) {
               ajax.body = JSON.stringify(data);  
               ajax.go();
               this._targetElem.innerHTML = '';
