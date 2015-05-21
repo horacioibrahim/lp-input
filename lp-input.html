@@ -534,12 +534,11 @@ slack inputs.
             if (body.length > 0) {
               ajax.body = JSON.stringify(data);  
               ajax.go();
-              this._targetElem.innerHTML = '';
+              this.addEventListener('core-response', function(){
+                this._targetElem.innerHTML = '';  
+              });
             }
 
-            if(!this.register) {
-              this.fire('sc-error-handling', {error: "Not selected register"});
-            }
         },
         setRegister: function(source, eventName, elem) {
             source.addEventListener(eventName, function(e) {
