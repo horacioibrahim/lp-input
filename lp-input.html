@@ -1,7 +1,7 @@
-<link rel="import" href="../bower_components/polymer/polymer.html">
-<link rel="import" href="../bower_components/core-ajax/core-ajax.html">
-<link rel="import" href="../bower_components/core-a11y-keys/core-a11y-keys.html">
-
+<link rel="import" href="../polymer/polymer.html">
+<link rel="import" href="../core-ajax/core-ajax.html">
+<link rel="import" href="../core-a11y-keys/core-a11y-keys.html">
+<link rel="import" href="../sc-boxselect/sc-boxselect.html">
 <!--
 lp-input is a custom "fake input" to search users, hashtags by ajax and to 
 format the content by using ordinary div#editable. Works like twitter, facebook,
@@ -18,7 +18,7 @@ slack inputs.
 @homepage http://github.com/horacioibrahim/lp-input
 -->
 
-<polymer-element name="lp-input" attributes="target mentionsURL url method">
+<polymer-element name="lp-input" attributes="target mentionsURL url method boxTarget">
   <template>
 
       <link rel="stylesheet" href="lp-input.css">
@@ -26,27 +26,14 @@ slack inputs.
       <!-- dropdown list of users 
            init search by @na...
       -->
-      <div id="mentionsContainer">
-          <ul id="ulMentionsContainer">
-            <template repeat="{{user in Users}}">
-              <li on-click="{{ selectedUser }}" data-shortname="{{ user.shortname }}"
-              data-location="{{ user.location }}" data-avatar="{{ user.avatar }}">
-                  <div class="mentions">
-                      <div class="avatar">
-                          <img src="{{user.avatar}}">
-                      </div>
-                      <div class="info">
-                        <div class="username">{{ user.shortname }}</div>
-                        <div class="details">{{ user.location }}</div> 
-                      </div>
-                  </div>          
-              </li> 
-            </template>
-          </ul>
-      </div>
+      <sc-boxselect id="boxSelect" target="{{boxTarget}}" showThumbs="true"></sc-boxselect>      
 
       <!-- shortcut -->
       <core-a11y-keys target="{{_targetElem}}" keys="Enter" on-keys-pressed="{{sendTo}}"></core-a11y-keys>
+      <core-a11y-keys target="{{_targetElem}}" keys="esc" on-keys-pressed="{{boxclose}}"></core-a11y-keys>        
+      <core-a11y-keys target="{{_targetElem}}" keys="up" on-keys-pressed="{{selectPrevious}}"></core-a11y-keys>
+      <core-a11y-keys target="{{_targetElem}}" keys="down" on-keys-pressed="{{selectNext}}"></core-a11y-keys>   
+
 
       <!-- dropdown list of hashtags -->
       <div class="hashtags"></div>
@@ -56,8 +43,14 @@ slack inputs.
         <br/>
       </div> 
 
+      <!-- dialogs -->
+      <paper-action-dialog id="dialogMessage" heading="Info" backdrop="true">
+        <p>Some content</p>
+        <paper-button affirmative autofocus>OK</paper-button>
+      </paper-action-dialog> 
+
       <!-- ajax -->
-      <core-ajax auto="true" id="mentionsAjax" url="{{ mentions }}"
+      <core-ajax auto="true" id="mentionsAjax" url="{{ _mentions }}"
       response="{{responseUsers}}"></core-ajax>
       <core-ajax id="tagsAjax" url="{{ tagsURL }}" response="{{responseTags}}"></core-ajax>
       <core-ajax id="coreAjaxInput" url="{{url}}" handleAs="json" 
@@ -69,12 +62,7 @@ slack inputs.
   </template>
   <script>
     (function () {
-      Polymer('lp-input', {
-        /**
-        * Fired when a user is selected in mentions box.
-        *
-        * @event selected-user
-        */   
+      Polymer('lp-input', {  
         /**
         * The `sc-error-handling` fires when user try to post comments without
         * the number of the register. To handling this events to show pop-up
@@ -178,6 +166,24 @@ slack inputs.
           });                  
 
           this.setRegister(document, 'sc-select', fakeThis);
+          this.boxSelect = this.$.boxSelect;
+
+          // Firefox wrapper to check down
+          var is_firefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
+          if (is_firefox) {
+            this._targetElem.addEventListener('keydown', function(ev) {
+              // forcing action because firefox's behavior.
+              if (ev.keyCode == 40) { // down
+                fakeThis.selectNext();
+              }
+              if (ev.keyCode == 38) { // up
+                fakeThis.selectPrevious();
+              }      
+              if (ev.keyCode == 27) { // up
+                fakeThis.boxclose();
+              }                      
+            });
+          }
         },
         /*
         * Checks if textContent of the contentEditable was changed. If the input
@@ -203,39 +209,19 @@ slack inputs.
           if (/^@/g.test(nodeValue) && nodeValue.length > 3 ) {
               this.getMentions(nodeValue);
               this.addEventListener('selected-user', function(ev) {
-                currentNode.nodeValue = '@' + ev.detail.response.shortname;
+                this.boxclose();
+                currentNode.nodeValue = '@' + ev.detail.response.content + ' ';
                 this._restoreSelection(indexCurrent, currentNode.nodeValue.length);
               });
           }
-        }, 
-        /*
-        * Gets data from user selected/tapped in mentions list. Fires the 
-        * 'selected-user' event.
-        *
-        * @method selectedUser
-        */        
-        selectedUser: function(ev, detail, target) {
-            shortname = target.attributes['data-shortname'].value;
-            avatar = target.attributes['data-avatar'].value;
-            section = target.attributes['data-location'].value;
-            this.hideMentions(); // hide box
-            this.fire('selected-user', {response: {'shortname': shortname, 'avatar': avatar, 'section': section}})
-        },    
+        },     
         /*
         * Show Mentions Box.
         *
         * @method showMentions
         */             
         showMentions: function() {
-          this.$.mentionsContainer.style.display = "block";
-        },
-        /*
-        * Hide Mentions Box.
-        *
-        * @method hideMentions
-        */          
-        hideMentions: function() {        
-            this.$.mentionsContainer.style.display = "none";
+          this.boxSelect.opened = true;
         },
         /*
         * Emits the responseUsers's updates. Creates an URL to access the user's 
@@ -253,12 +239,24 @@ slack inputs.
             } else {
               url = this.mentionsURL.concat('/', expr);
             }
-            this.mentions = url;            
+             url = url.concat('/', '5')
+            this._mentions = url;            
         },
         responseUsersChanged: function() {
+           var boxSelect = this.boxSelect;
+           var arrayOfHashes = [];
            data = JSON.parse(this.responseUsers);
-           this.Users = data.Users;
-           this.showMentions();
+           
+           if (data != null) {
+             var users = data["Users"]; 
+             function callbackUsers(elem, index, array) {
+               hash = {'thumbnail': elem.avatar, 'content': elem.shortname};
+               arrayOfHashes.push(hash);
+             }
+             users.forEach(callbackUsers);
+             boxSelect.setItems(arrayOfHashes);
+             this.showMentions(); 
+           }
         },
         /*
         * Emits the responseTags's updates. Creates an URL to access the tag's 
@@ -335,7 +333,11 @@ slack inputs.
                       }
 
                     } else {
-                      range.setStart(textNode, nodeOffset);
+                      try {
+                         range.setStart(textNode, nodeOffset);  
+                      } catch (err) {
+                         // pass
+                      }
                     }
                     // applied changes
                     s.removeAllRanges();
@@ -478,7 +480,10 @@ slack inputs.
             nodeIndex = inNodePosition[0];
             nodeOffset = inNodePosition[1]; 
             // check if exists blank space in formatted hashtag
-            this.isNewNode = this._hasWhiteSpace(this.$.editableFilter.childNodes[indexCurrent]);  
+            this.isNewNode = this._hasWhiteSpace(this.$.editableFilter.childNodes[indexCurrent]); 
+            if(this.isNewNode) {
+              this.boxclose();
+            } 
             // By last...changes the shadow/copy of the target
             this.$.editableFilter.innerHTML = newText;
             // Restores the caret with this function
@@ -531,12 +536,29 @@ slack inputs.
             data['body'] = body;
             data['register'] = this.register;
             data['author'] = dataUser['pk']; // TODO: fix it
-            if (body.length > 0) {
+            if (body.length > 0 && this.boxSelect.opened == false) {
               ajax.body = JSON.stringify(data);  
-              ajax.go();
-              this.addEventListener('core-response', function(){
-                this._targetElem.innerHTML = '';  
-              });
+              if (this.register) {
+                ajax.go();  
+                this._targetElem.innerHTML = ''
+              } else {
+                if (this.tagRegex.test(body)) {
+                  ajax.go();
+                  this._targetElem.innerHTML = ''
+                } else {
+                  // Handling error messages
+                  var dialogMessage = this.$.dialogMessage;
+                  // TODO: put this messages to dialog in backend
+                  dialogMessage.querySelector('p').textContent = "Selecione um " 
+                   + "chamado no menu ou escreva colocando "
+                   +  "uma #hashtag para definir o #Assunto."
+                  dialogMessage.opened = true;
+                }
+              }
+            } 
+
+            if (this.boxSelect.opened == true) { 
+              this.boxSelect.selection();
             }
 
         },
@@ -551,7 +573,15 @@ slack inputs.
           // to fire a 'sc-sse-response' fake similar at sc-sse 
           this.fire('sc-sse-response', {response: this.responseComments, alias: 'sseTimeline'});
         },
-
+        selectPrevious: function() {
+          this.boxSelect.selectPrevious();
+        },
+        selectNext: function() {
+          this.boxSelect.selectNext();
+        },  
+        boxclose: function() {
+          this.boxSelect.close();
+        },     
       });
     })();
   </script>
