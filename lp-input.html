@@ -499,7 +499,8 @@ slack inputs.
         * @return formatted string
         */                                 
         formatter: function(text) {
-          var unameHtagRegex = /(#|@){1}([A-Z]+[A-Z0-9]+)/ig;
+          // supported under and dunder ;)
+          var unameHtagRegex = /(#|@){1}([A-Z]+([_]+)?[A-Z0-9]+)(([_]+)?[A-Z0-9]+)+/ig;
 
           function wrapEm(match) {
               return "<em>" + match + "</em>";
